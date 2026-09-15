@@ -203,6 +203,35 @@ class CodeActionTest(LspTest):
         actions, _ = self.code_actions(TWO_VIOLATIONS, line=0)
         self.assertEqual([], actions)
 
+    def test_syntax_error(self) -> None:
+        # a half-typed document should not raise, it just has nothing to offer
+        actions, _ = self.code_actions("def f(:\n", line=0, column=6)
+        self.assertEqual([], actions)
+
+    def test_untitled_document(self) -> None:
+        # editors open scratch buffers under schemes with no filesystem path
+        server = LSP(
+            Options(),
+            LSPOptions(tcp=None, ws=None, stdio=False, debounce_interval=0),
+        )
+        server.lsp.protocol._workspace = Workspace(None)
+        uri = "untitled:Untitled-1"
+        server.lsp.workspace.put_text_document(
+            TextDocumentItem(
+                uri=uri, language_id="python", version=1, text=TWO_VIOLATIONS
+            )
+        )
+        start = Position(line=1, character=9)
+        self.assertIsNone(
+            server.code_action(
+                CodeActionParams(
+                    text_document=TextDocumentIdentifier(uri=uri),
+                    range=Range(start=start, end=start),
+                    context=CodeActionContext(diagnostics=[]),
+                )
+            )
+        )
+
     def test_only_filter(self) -> None:
         actions, _ = self.code_actions(
             TWO_VIOLATIONS, line=1, column=9, only=["source.organizeImports"]
